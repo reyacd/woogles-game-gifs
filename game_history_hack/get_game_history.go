@@ -17,43 +17,22 @@ import (
 
 func GetGameHistory (id string) (*macondopb.GameHistory, error) {
 
-    gcgRequest := &pb.GCGRequest{ GameId: id }
-    req, _ := proto.Marshal(gcgRequest)
+    gameHistoryRequest := &pb.GameHistoryRequest{ GameId: id }
+    req, _ := proto.Marshal(gameHistoryRequest)
 
-    response, err := http.Post("https://woogles.io/twirp/game_service.GameMetadataService/GetGCG", 
+    response, err := http.Post("https://woogles.io/twirp/game_service.GameMetadataService/GetGameHistory", 
                                "application/protobuf", bytes.NewBuffer(req))
 
     if err != nil {
         return &macondopb.GameHistory{}, fmt.Errorf("HTTP Post Error: %s\n", err)
     } else {
-        gcgResponse := &pb.GCGResponse{}
+        gameHistoryResponse := &pb.GameHistoryResponse{}
         bytes, _ := ioutil.ReadAll(response.Body)
-        if err := proto.Unmarshal(bytes, gcgResponse); err != nil {
+        if err := proto.Unmarshal(bytes, gameHistoryResponse); err != nil {
             return &macondopb.GameHistory{}, fmt.Errorf("Unmarshaling Error: %s\n%v\n", err, response.Body)
         } else {
-            fmt.Println("GCG request successful!\n")
+            fmt.Println("Game History request successful!\n")
         }
-
-        cfg := &config.Config{ 
-            Debug: false,
-	    LetterDistributionPath: "../../macondo/data/letterdistributions",
-	    StrategyParamsPath: "../../macondo/data/strategy",
-	    LexiconPath: "../../macondo/data/lexica",
-	    DefaultLexicon: "NWL20",
-	    DefaultLetterDistribution: "English",
-        } 
-    
-        reader := strings.NewReader(gcgResponse.Gcg)
-        if err != nil {
-            return &macondopb.GameHistory{}, fmt.Errorf("Reader Error: %s\n", err)
-        }
-    
-        gameHistory, err := gcgio.ParseGCGFromReader(cfg, reader)
-        if err != nil {
-            return &macondopb.GameHistory{}, fmt.Errorf("GCG Parse Error: %s\n", err)
-        } else {
-            fmt.Println("GCG to GameHistory conversion successful!")
-            return gameHistory, nil
-        }
+        return *(gameHistoryResponse.History), nil
     }
 }
