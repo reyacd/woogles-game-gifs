@@ -5,6 +5,7 @@ import (
     "context"
     "fmt"
     "image"
+    "image/color"
     "image/color/palette"
     "image/draw"
     "image/gif"
@@ -15,6 +16,8 @@ import (
 
     pb "github.com/domino14/liwords/rpc/api/proto/game_service"
     macondopb "github.com/domino14/macondo/gen/api/proto/macondo"
+
+    //"github.com/golang/freetype"
 )
 
 var boardConfig = []string{
@@ -54,6 +57,8 @@ var boardSrc = map[byte][2]int{
     '\'': {5, 5}, '"': {5, 6}, '*': {5, 7}, ' ': {5, 8},
 }
 
+var bottomPanelColor = color.RGBA{227, 226, 238, 255}
+
 // Doubled because of retina screen.
 const squareDim = 2 * 34
 
@@ -78,7 +83,7 @@ func loadTilesImg() (image.Image, error) {
 
 func AnimateGame(tilesImg image.Image, boardConfig []string, hist *macondopb.GameHistory) (*gif.GIF, error) {
 
-    img := image.NewPaletted(image.Rect(0, 0, 15*squareDim, 15*squareDim), palette.Plan9)
+    img := image.NewPaletted(image.Rect(0, 0, 15*squareDim, 17*squareDim), palette.Plan9)
     gameGif := &gif.GIF{}
 
     // Draw the board.
@@ -95,6 +100,11 @@ func AnimateGame(tilesImg image.Image, boardConfig []string, hist *macondopb.Gam
                       image.Pt(srcPt[1]*squareDim, srcPt[0]*squareDim), draw.Over)
         }
     }
+
+    // Draw the bottom panel.
+    draw.Draw(img, image.Rect(0, 15*squareDim, 15*squareDim, 17*squareDim), 
+              &image.Uniform{bottomPanelColor}, image.ZP, draw.Over)
+
     gameGif.Image = append(gameGif.Image, img) 
     gameGif.Delay = append(gameGif.Delay, 100)
 
