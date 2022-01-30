@@ -101,7 +101,13 @@ func AnimateGame(tilesImg image.Image, boardConfig []string, hist *pb.GameHistor
         for i := range hist.Events {
 	    evtImg := image.NewPaletted(prevImg.Bounds(), palette.Plan9)
             draw.Draw(evtImg, evtImg.Bounds(), prevImg, image.Pt(0, 0), draw.Over)
-            drawEvent(*hist.Events[i], evtImg, tilesImg)
+            removePhony, err := drawEvent(*hist.Events[i], evtImg, tilesImg)
+            if err != nil {
+                return &gif.GIF{}, fmt.Errorf("Error drawing event: %v", err)
+            } 
+            if removePhony {
+                draw.Draw(evtImg, evtImg.Bounds(), gameGif.Image[i-1], image.Pt(0, 0), draw.Over)
+            }
             gameGif.Image = append(gameGif.Image, evtImg)
             gameGif.Delay = append(gameGif.Delay, 100)
             prevImg = evtImg
@@ -143,15 +149,17 @@ func drawPlay(evt pb.GameEvent, boardImg *image.Paletted, tilesImg image.Image) 
     }
 }
 
-func drawEvent(evt pb.GameEvent, boardImg *image.Paletted, tilesImg image.Image) error {
+func drawEvent(evt pb.GameEvent, boardImg *image.Paletted, tilesImg image.Image) (bool, error) {
 	evtType := evt.GetType()
+        removePhony := false
 
 	switch evtType {
 	case pb.GameEvent_TILE_PLACEMENT_MOVE:
             fmt.Printf("Tile Placement Play ") 
             drawPlay(evt, boardImg, tilesImg)
 	case pb.GameEvent_PHONY_TILES_RETURNED:
-            fmt.Printf("Not implemented") 
+            fmt.Printf("Phony tiles returned!\n") 
+            removePhony = true
 	case pb.GameEvent_PASS:
             fmt.Printf("Not implemented") 
 	case pb.GameEvent_CHALLENGE_BONUS:
@@ -168,10 +176,10 @@ func drawEvent(evt pb.GameEvent, boardImg *image.Paletted, tilesImg image.Image)
             fmt.Printf("Not implemented") 
 
 	default:
-	    return fmt.Errorf("event type %v not supported", evtType)
+	    return removePhony, fmt.Errorf("event type %v not supported", evtType)
 
 	}
-        return nil
+        return removePhony, nil
 }
 
 func imgToPngBytes(img image.Image) ([]byte, error) {
