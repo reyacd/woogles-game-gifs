@@ -5,10 +5,7 @@ import (
     "bytes"
     "io/ioutil"
     "net/http"
-    "strings"
     
-    "github.com/domino14/macondo/gcgio"
-    "github.com/domino14/macondo/config"
     pb "github.com/domino14/liwords/rpc/api/proto/game_service"
     macondopb "github.com/domino14/macondo/gen/api/proto/macondo"
 
@@ -33,6 +30,6 @@ func GetGameHistory (id string) (*macondopb.GameHistory, error) {
         } else {
             fmt.Println("Game History request successful!\n")
         }
-        return *(gameHistoryResponse.History), nil
+        return gameHistoryResponse.History, nil
     }
 }
