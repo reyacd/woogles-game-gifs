@@ -12,6 +12,10 @@ import (
     "io/ioutil"
     "net/http"
     "os"
+    "strings"
+
+    "github.com/domino14/macondo/gcgio"
+    "github.com/domino14/macondo/config"
 
     pb "github.com/domino14/liwords/rpc/api/proto/game_service"
     macondopb "github.com/domino14/macondo/gen/api/proto/macondo"
@@ -196,6 +200,16 @@ func GetGameHistory(id string) (*macondopb.GameHistory, error) {
     return history.History, nil
 }
 
+func GetCrossTablesGcg(id string) (string, error) {
+    crossTablesUrl := fmt.Sprintf("https://cross-tables.com/annotated/selfgcg/%v/anno%v.gcg", id[:3], id) 
+    response, err := http.Get(crossTablesUrl)
+    gcg, err := ioutil.ReadAll(response.Body)
+    if err != nil {
+        return "", fmt.Errorf("Error reading response from cross-tables.")
+    }
+    return string(gcg), nil
+}
+
 func main() {
 
     // Cache this.
@@ -203,15 +217,37 @@ func main() {
     if err != nil {
         panic(err)
     }
- 
-    gameHistory, err := GetGameHistory(string(os.Args[1])) 
-    if err != nil {
-        fmt.Println("Caught Error", err)
-    }
 
+    gameHistory := &macondopb.GameHistory{}
+    var id string
+    if strings.Contains(os.Args[1], "ct:") {
+        id = strings.Split(os.Args[1], ":")[1]
+        gcg, err := GetCrossTablesGcg(id)
+        if err != nil {
+            fmt.Errorf("Unable to look up cross-tables GCG for provided ID: %v. Received error: %v", id, err)
+        }
+        cfg := &config.Config{ StrategyParamsPath: "data/strategy",
+                               LexiconPath: "data/lexica",
+                               LetterDistributionPath: "data/letterdistributions",
+                               DefaultLexicon: "NWL20",
+                               DefaultLetterDistribution: "English" }
+        
+        gameHistory, err = gcgio.ParseGCGFromReader(cfg, strings.NewReader(gcg)) 
+        if err != nil {
+            fmt.Errorf("Error encountered parsing gcg from reader: %v", err)
+        }
+        
+    } else {
+
+        id = string(os.Args[1])
+        gameHistory, err = GetGameHistory(id) 
+        if err != nil {
+            fmt.Println("Caught Error", err)
+        }
+    }
     gameGif, err := AnimateGame(tilesImg, boardConfig, gameHistory)
 
-    f, err := os.OpenFile(string(os.Args[1]) + ".gif", os.O_RDWR|os.O_CREATE, 0755)
+    f, err := os.OpenFile(id + ".gif", os.O_RDWR|os.O_CREATE, 0755)
     if err != nil {
         panic(err)
     }
