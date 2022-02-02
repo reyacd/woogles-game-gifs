@@ -1,5 +1,7 @@
 # woogles-game-gifs
 Code for creating GIF replays of games played on Woogles.io.
+## Example Output
+<img src="https://github.com/reyacd/woogles-game-gifs/blob/main/data/example-GdTkgTga.gif" width="400" height="400"/>
 
 # Requirements
 Go is required to run the gif generator. To install, reference https://go.dev/doc/install.
