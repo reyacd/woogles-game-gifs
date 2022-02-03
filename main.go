@@ -6,7 +6,6 @@ import (
     "fmt"
     "image"
     "image/color"
-    "image/color/palette"
     "image/draw"
     "image/gif"
     "image/png"
@@ -57,7 +56,37 @@ var boardSrc = map[byte][2]int{
     '\'': {5, 5}, '"': {5, 6}, '*': {5, 7}, ' ': {5, 8},
 }
 
-var bottomPanelColor = color.RGBA{227, 226, 238, 255}
+var panelColor = color.RGBA{0x41, 0x41, 0x41, 0xff}
+
+// From liwords/liwords-ui/src/color_modes.scss
+// color-board-dls: #b9e7f5,
+// color-board-dws: #f6c0c0,
+// color-board-tws: #a92e2e,
+// color-board-tls: #3b88ca,
+// color-board-empty: #ffffff,
+// color-tile-background: #6b268b,
+// color-tile-background-secondary: #cfb7d1,
+// color-tile-background-tertiary: #955f9a,
+// color-tile-background-quaternary: #dec5e4,
+// color-tile-blank-text: #6b268b,
+// color-tile-text: #ffffff,
+// color-tile-last-background: #f4b000,
+// color-tile-last-text: #414141,
+// color-tile-last-blank: #414141,
+
+var colorPalette = []color.Color{ 
+    color.RGBA{0xb9, 0xe7, 0xf5, 0xff}, 
+    color.RGBA{0xf6, 0xc0, 0x0c, 0xff},
+    color.RGBA{0xa9, 0x2e, 0x2e, 0xff},
+    color.RGBA{0x3b, 0x88, 0xca, 0xff},
+    color.RGBA{0xff, 0xff, 0xff, 0xff},
+    color.RGBA{0x6b, 0x26, 0x8b, 0xff},
+    color.RGBA{0xcf, 0xb7, 0xd1, 0xff},
+    color.RGBA{0x95, 0xf5, 0x9a, 0xff},
+    color.RGBA{0xde, 0xc5, 0xe4, 0xff},
+    color.RGBA{0x6b, 0x26, 0x8b, 0xff},
+    color.RGBA{0xf4, 0xb0, 0x00, 0xff},
+    color.RGBA{0x41, 0x41, 0x41, 0xff} }
 
 // Doubled because of retina screen.
 const squareDim = 2 * 34
@@ -83,7 +112,7 @@ func loadTilesImg() (image.Image, error) {
 
 func AnimateGame(tilesImg image.Image, boardConfig []string, hist *macondopb.GameHistory) (*gif.GIF, error) {
 
-    img := image.NewPaletted(image.Rect(0, 0, 15*squareDim, 17*squareDim), palette.Plan9)
+    img := image.NewPaletted(image.Rect(0, 0, 15*squareDim, 17*squareDim), colorPalette)
     gameGif := &gif.GIF{}
 
     // Draw the board.
@@ -100,17 +129,20 @@ func AnimateGame(tilesImg image.Image, boardConfig []string, hist *macondopb.Gam
                       image.Pt(srcPt[1]*squareDim, srcPt[0]*squareDim), draw.Over)
         }
     }
+    // Draw the top panel.
+    draw.Draw(img, image.Rect(0, 0, 15*squareDim, squareDim), 
+              &image.Uniform{panelColor}, image.ZP, draw.Over)
 
     // Draw the bottom panel.
-    draw.Draw(img, image.Rect(0, 15*squareDim, 15*squareDim, 17*squareDim), 
-              &image.Uniform{bottomPanelColor}, image.ZP, draw.Over)
+    draw.Draw(img, image.Rect(0, 16*squareDim, 15*squareDim, 17*squareDim), 
+              &image.Uniform{panelColor}, image.ZP, draw.Over)
 
     gameGif.Image = append(gameGif.Image, img) 
     gameGif.Delay = append(gameGif.Delay, 100)
 
     prevImg := img
     for i := range hist.Events {
-	evtImg := image.NewPaletted(prevImg.Bounds(), palette.Plan9)
+	evtImg := image.NewPaletted(prevImg.Bounds(), colorPalette)
         draw.Draw(evtImg, evtImg.Bounds(), prevImg, image.Pt(0, 0), draw.Over)
         removePhony, err := drawEvent(*hist.Events[i], evtImg, tilesImg)
         if err != nil {
