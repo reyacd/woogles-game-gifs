@@ -1,3 +1,7 @@
+# IMPORTANT NOTE
+This repository is obsolete based on the recent additions to github.com/domino14/liwords/tiles.go
+That GIF generator is faster and more memory efficient so use it instead! I believe it will eventually be an actual export feature on the actual website as well.
+
 # woogles-game-gifs
 Code for creating GIF replays of games played on Woogles.io.
 ## Example Output
