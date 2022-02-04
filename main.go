@@ -16,7 +16,7 @@ import (
     pb "github.com/domino14/liwords/rpc/api/proto/game_service"
     macondopb "github.com/domino14/macondo/gen/api/proto/macondo"
 
-    //"github.com/golang/freetype"
+    "github.com/golang/freetype"
 )
 
 var boardConfig = []string{
@@ -90,6 +90,8 @@ var colorPalette = []color.Color{
 
 // Doubled because of retina screen.
 const squareDim = 2 * 34
+const topOffset = squareDim
+const fontSize = 12
 
 func loadTilesImg() (image.Image, error) {
 
@@ -110,14 +112,41 @@ func loadTilesImg() (image.Image, error) {
     return img, nil
 }
 
-func AnimateGame(tilesImg image.Image, boardConfig []string, hist *macondopb.GameHistory) (*gif.GIF, error) {
+func updatePlayerOne(cxt *freetype.Context, name string, score int32, img draw.Image) {
+    cxt.SetDst(img)
+    pt := freetype.Pt(squareDim / 2, squareDim / 2 + int(cxt.PointToFixed(fontSize)>>6))
+    label := fmt.Sprintf("Player %s Score %d", name, score)
+    for _, letter := range label {
+        _, err := cxt.DrawString(string(letter), pt) 
+        if err != nil {
+            fmt.Errorf("Font draw error: %v", err)
+            return
+        }
+    }
+}
+
+func updatePlayerTwo(cxt *freetype.Context, name string, score int32, img draw.Image) {
+    cxt.SetDst(img)
+    pt := freetype.Pt(squareDim / 2, 33 * squareDim / 2 + int(cxt.PointToFixed(fontSize)>>6))
+    label := fmt.Sprintf("Player %s Score %d", name, score)
+    for _, letter := range label {
+        _, err := cxt.DrawString(string(letter), pt) 
+        if err != nil {
+            fmt.Errorf("Font draw error: %v", err)
+            return
+        }
+    }
+}
+
+func AnimateGame(tilesImg image.Image, boardConfig []string, hist *macondopb.GameHistory,
+                 cxt *freetype.Context) (*gif.GIF, error) {
 
     img := image.NewPaletted(image.Rect(0, 0, 15*squareDim, 17*squareDim), colorPalette)
     gameGif := &gif.GIF{}
 
     // Draw the board.
     for r := 0; r < 15; r++ {
-        y := r * squareDim
+        y := r * squareDim + topOffset
 	for c := 0; c < 15; c++ {
 	    x := c * squareDim
             b := boardConfig[r][c]
@@ -132,24 +161,31 @@ func AnimateGame(tilesImg image.Image, boardConfig []string, hist *macondopb.Gam
     // Draw the top panel.
     draw.Draw(img, image.Rect(0, 0, 15*squareDim, squareDim), 
               &image.Uniform{panelColor}, image.ZP, draw.Over)
+    updatePlayerOne(cxt, hist.Players[0].Nickname, 0, img)
 
     // Draw the bottom panel.
     draw.Draw(img, image.Rect(0, 16*squareDim, 15*squareDim, 17*squareDim), 
               &image.Uniform{panelColor}, image.ZP, draw.Over)
+    updatePlayerTwo(cxt, hist.Players[1].Nickname, 0, img)
 
     gameGif.Image = append(gameGif.Image, img) 
     gameGif.Delay = append(gameGif.Delay, 100)
 
     prevImg := img
-    for i := range hist.Events {
+    for i, evt := range hist.Events {
 	evtImg := image.NewPaletted(prevImg.Bounds(), colorPalette)
         draw.Draw(evtImg, evtImg.Bounds(), prevImg, image.Pt(0, 0), draw.Over)
-        removePhony, err := drawEvent(*hist.Events[i], evtImg, tilesImg)
+        removePhony, err := drawEvent(*evt, evtImg, tilesImg)
         if err != nil {
             return &gif.GIF{}, fmt.Errorf("Error drawing event: %v", err)
         } 
         if removePhony {
             draw.Draw(evtImg, evtImg.Bounds(), gameGif.Image[i-1], image.Pt(0, 0), draw.Over)
+        }
+        if evt.Nickname == hist.Players[0].Nickname {
+            updatePlayerOne(cxt, evt.Nickname, evt.Score, evtImg)
+        } else {
+            updatePlayerTwo(cxt, evt.Nickname, evt.Score, evtImg)
         }
         gameGif.Image = append(gameGif.Image, evtImg)
         gameGif.Delay = append(gameGif.Delay, 100)
@@ -179,7 +215,7 @@ func drawPlay(evt macondopb.GameEvent, boardImg *image.Paletted, tilesImg image.
     idx := 0
     fmt.Printf("%s %s\n", evt.Position, evt.PlayedTiles)
     for i := row; i < nRows; i++ {
-        y := i * squareDim
+        y := i * squareDim + topOffset
         for j := column; j < nCols; j++ {
             x := j * squareDim 
             letter := evt.PlayedTiles[idx] 
@@ -201,7 +237,7 @@ func drawEvent(evt macondopb.GameEvent, boardImg *image.Paletted, tilesImg image
     switch evtType {
     case macondopb.GameEvent_TILE_PLACEMENT_MOVE:
         fmt.Printf("Tile Placement Play ") 
-        drawPlay(evt, boardImg, tilesImg)
+        drawPlay(evt, boardImg, tilesImg) 
     case macondopb.GameEvent_PHONY_TILES_RETURNED:
         fmt.Printf("Phony tiles returned!\n") 
         removePhony = true
@@ -245,13 +281,30 @@ func main() {
     if err != nil {
         panic(err)
     }
+
+    // Load font data
+    fontBytes, err := ioutil.ReadFile("data/FjallaOne-Regular.ttf")
+    if err != nil {
+        panic(err)
+    }
+
+    font, err := freetype.ParseFont(fontBytes)
+    if err != nil {
+        panic(err)
+    }
+
+    cxt := freetype.NewContext()
+    cxt.SetDPI(72)
+    cxt.SetFont(font)
+    cxt.SetFontSize(fontSize)
+    cxt.SetSrc(image.White)
  
     gameHistory, err := GetGameHistory(string(os.Args[1])) 
     if err != nil {
         fmt.Println("Caught Error", err)
     }
 
-    gameGif, err := AnimateGame(tilesImg, boardConfig, gameHistory)
+    gameGif, err := AnimateGame(tilesImg, boardConfig, gameHistory, cxt)
 
     f, err := os.OpenFile(string(os.Args[1]) + ".gif", os.O_RDWR|os.O_CREATE, 0755)
     if err != nil {
